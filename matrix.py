@@ -1,3 +1,7 @@
+# matriks/matrix.py
+# Tambahkan baris ini di bagian atas file
+# Kode ini direvisi oleh tim inti.
+
 class Matrix:
     """
     Kelas untuk merepresentasikan objek matriks.
