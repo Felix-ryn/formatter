@@ -1,7 +1,4 @@
-# matriks/matrix.py
-# Tambahkan baris ini di bagian atas file
-# Kode ini direvisi oleh tim inti.
-
+# matrix.py
 class Matrix:
     """
     Kelas untuk merepresentasikan objek matriks.
@@ -14,3 +11,9 @@ class Matrix:
         self.cols = len(data[0]) if self.rows > 0 else 0
         if not all(len(row) == self.cols for row in data):
             raise ValueError("Semua baris harus memiliki jumlah kolom yang sama.")
+
+    def __repr__(self):
+        return f"Matrix(rows={self.rows}, cols={self.cols})"
+
+    def __str__(self):
+        return "\n".join(" ".join(map(str, row)) for row in self.data)

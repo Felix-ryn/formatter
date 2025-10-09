@@ -1,8 +1,9 @@
+# adder.py
 from ..matrix import Matrix
 
 def add_matrices(matrix1, matrix2):
     """
-    Melakukan operasi penjumlahan pada dua objek matriks.
+    Penjumlahan dua matriks (mengembalikan Matrix).
     """
     if matrix1.rows != matrix2.rows or matrix1.cols != matrix2.cols:
         raise ValueError("Matriks harus memiliki dimensi yang sama untuk penjumlahan.")

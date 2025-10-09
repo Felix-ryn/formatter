@@ -1,8 +1,9 @@
+# subtractor.py
 from ..matrix import Matrix
 
 def subtract_matrices(matrix1, matrix2):
     """
-    Melakukan operasi pengurangan pada dua objek matriks.
+    Pengurangan dua matriks.
     """
     if matrix1.rows != matrix2.rows or matrix1.cols != matrix2.cols:
         raise ValueError("Matriks harus memiliki dimensi yang sama untuk pengurangan.")

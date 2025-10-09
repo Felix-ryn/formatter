@@ -1,13 +1,14 @@
+# determinant.py
 from ..utilities.validators import is_square
 
 def find_determinant(matrix):
     """
     Menghitung determinan dari matriks persegi 2x2 atau 3x3.
+    matrix: list of lists
     """
-    n = len(matrix)
     if not is_square(matrix):
         raise ValueError("Matrix must be a square matrix to find its determinant.")
-
+    n = len(matrix)
     if n == 2:
         return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]
     elif n == 3:
