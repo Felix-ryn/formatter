@@ -1,4 +1,14 @@
 # matriks/main.py
+"""
+Main runner untuk package matriks.
+
+Contoh:
+  # menggunakan POSIX path (di WSL)
+  python3 -m matriks.main --a /home/felix_ryan/formatter/house_multifeature.csv --skip-header --impute mean --normalize zscore
+
+  # menggunakan UNC WSL dari Windows (kutip path)
+  python -m formatter.main --a /home/felix_ryan/formatter/house_multifeature.csv --skip-header
+"""
 
 import os
 import argparse
@@ -13,6 +23,13 @@ from .exporters.csv_exporter import export_to_csv
 from .exporters.json_exporter import export_to_json
 
 def normalize_wsl_path(path: str) -> str:
+    """
+    Normalisasi path UNC WSL atau path dengan backslashes menjadi POSIX path.
+    Examples:
+      \\wsl.localhost\Ubuntu\home\user\file.csv  -> /home/user/file.csv
+      \\wsl$\Ubuntu\home\user\file.csv           -> /home/user/file.csv
+    Jika bukan UNC WSL, fungsi ini mengganti backslash -> slash di lingkungan POSIX.
+    """
     if not path:
         return path
     p = path.strip()
