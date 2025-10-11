@@ -1,16 +1,22 @@
-# matriks/main.py
+# main.py
 
 import os
 import argparse
 import sys
 import time
 
-from .utilities.csv_loader import load_matrix_from_csv
-from .utilities import print_matrix
-from .operations.adder import add_matrices
-from .operations.multiplier import multiply_matrices
-from .exporters.csv_exporter import export_to_csv
-from .exporters.json_exporter import export_to_json
+# === Import dari package internal ===
+from utilities.csv_loader import load_matrix_from_csv
+from utilities.formatter import print_matrix
+from operations.adder import add_matrices
+from operations.multiplier import multiply_matrices
+from exporters.csv_exporter import export_to_csv
+from exporters.json_exporter import export_to_json
+
+# === Import validator baru ===
+from validators.is_square import is_square
+from validators.is_symmetric import is_symmetric
+from validators.is_identity import is_identity
 
 def normalize_wsl_path(path: str) -> str:
     if not path:
@@ -19,15 +25,14 @@ def normalize_wsl_path(path: str) -> str:
     # UNC: \\wsl.localhost\Distro\...
     if p.startswith("\\\\wsl.localhost\\") or p.startswith("\\\\wsl$\\"):
         parts = p.split("\\")
-        # parts example: ['', '', 'wsl.localhost', 'Ubuntu', 'home', 'user', 'file.csv']
         if len(parts) >= 5:
             rest = parts[4:]
             return "/" + "/".join(rest)
         return p.replace("\\", "/")
-    # If running on POSIX and the path contains backslashes, replace them
     if os.name == "posix" and "\\" in p:
         return p.replace("\\", "/")
     return p
+
 
 def parse_args():
     p = argparse.ArgumentParser(description="Load CSV(s) and run matrix operations.")
@@ -44,16 +49,15 @@ def parse_args():
     p.add_argument("--no-export", action="store_true", help="Jangan export hasil ke file.")
     return p.parse_args()
 
+
 def make_abs_and_normalize(path: str) -> str:
-    # terima UNC atau POSIX atau relative path; kembalikan absolute POSIX path bila memungkinkan
     if not path:
         return path
-    # jika UNC path (mengandung backslashes), normalize dulu
     normalized = normalize_wsl_path(path)
-    # jika path relatif, ubah ke absolute berdasarkan working dir saat ini
     if not os.path.isabs(normalized):
         normalized = os.path.abspath(normalized)
     return normalized
+
 
 def main():
     args = parse_args()
@@ -66,7 +70,7 @@ def main():
         if b_path:
             print(f"Loading B from: {b_path}")
 
-        # load matrices (csv_loader akan memilih Matrix/SparseMatrix)
+        # === Load matriks A ===
         matriks_a = load_matrix_from_csv(
             a_path,
             delimiter=args.delimiter,
@@ -80,6 +84,16 @@ def main():
         print("\n--- Matriks A (preview) ---")
         print(matriks_a)
 
+        # === Contoh penggunaan validator langsung ===
+        print("\n[Validasi Matriks A]")
+        try:
+            print("Persegi?    :", is_square(matriks_a.data))
+            print("Simetris?   :", is_symmetric(matriks_a.data))
+            print("Identitas?  :", is_identity(matriks_a.data))
+        except Exception as e:
+            print(f"[WARNING] Validasi gagal: {e}")
+
+        # === Jika matriks B juga disediakan ===
         if b_path:
             matriks_b = load_matrix_from_csv(
                 b_path,
@@ -93,7 +107,7 @@ def main():
             print("\n--- Matriks B (preview) ---")
             print(matriks_b)
 
-            # operasi
+            # === Operasi dasar ===
             print("\n--- Menjalankan Operasi: Penjumlahan & Perkalian ---")
             try:
                 hasil_penjumlahan = add_matrices(matriks_a, matriks_b)
@@ -118,14 +132,13 @@ def main():
                 print_matrix(hasil_perkalian)
                 print(f"\n(Waktu perkalian: {end_time - start_time:.4f} detik)")
 
-            # export hasil penjumlahan jika ada
+            # === Export hasil ===
             if not args.no_export and hasil_penjumlahan is not None:
                 export_to_csv(hasil_penjumlahan, "hasil_penjumlahan.csv")
                 export_to_json(hasil_penjumlahan, "hasil_penjumlahan.json")
                 print("\nFile hasil disimpan: hasil_penjumlahan.csv, hasil_penjumlahan.json")
 
         else:
-            # hanya A disediakan
             print("\n(Hanya matriks A yang diberikan — tidak ada operasi B.)")
             if not args.no_export:
                 export_to_csv(matriks_a, "matriks_a_copy.csv")
@@ -141,6 +154,7 @@ def main():
     except Exception as e:
         print(f"[ERROR] Exception: {e}", file=sys.stderr)
         sys.exit(4)
+
 
 if __name__ == "__main__":
     main()

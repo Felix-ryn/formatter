@@ -14,8 +14,8 @@ import csv
 import os
 import statistics
 
-from ..matrix import Matrix
-from ..sparsematrix import SparseMatrix
+from matrix import Matrix
+from sparsematrix import SparseMatrix
 
 Number = Union[int, float]
 
