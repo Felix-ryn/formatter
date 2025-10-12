@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualisasi Data Matriks</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // PENTING: Variabel ini sekarang berisi OBJEK JavaScript murni (seperti yang terlihat di View Source Anda).
+        // Kita tetap menggunakan | tojson karena memastikan data diserialisasi dengan benar (JSON keys dikutip).
+        const CHART_DATA = {{ chart_data | tojson }};
+    </script>
+</head>
+<body>
+
+    <header>
+        <h1>Data Visualization Dashboard</h1>
+        <h2>Analisis Data dari `matriks_a_copy.csv`</h2>
+    </header>
+
+    <main>
+        <div class="chart-container">
+            <canvas id="myBarChart"></canvas>
+        </div>
+
+        <section class="data-info">
+            <h3>Status Data</h3>
+            <p>Visualisasi menggunakan Kolom 0 (Indeks) sebagai Label dan Kolom 3 (Nilai) sebagai Data.</p>
+        </section>
+    </main>
+
+    <footer>
+        <script src="{{ url_for('static', filename='js/chart_logic.js') }}"></script>
+        <p>&copy; 2024 Project Data Sains Mahasiswa</p>
+    </footer>
+
+</body>
+</html>
