@@ -7,6 +7,7 @@ def find_determinant(matrix):
     Menghitung determinan dari matriks persegi 2x2 atau 3x3.
     matrix: Matrix (objek)
     """
+    data = matrix.data if hasattr(matrix, "data") else matrix
     if not is_square(matrix.data):
         raise ValueError("Matrix harus persegi untuk menghitung determinan.")
 
