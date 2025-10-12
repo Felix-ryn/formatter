@@ -14,7 +14,7 @@ from exporters.csv_exporter import export_to_csv
 from exporters.json_exporter import export_to_json
 from operations.inverse import inverse_matrix
 from operations.transpose import transpose_matrix
-from operations.determinant import find_determinant
+from operations.linear_regression import linear_regression, predict   
 
 # === Import validator baru ===
 from validators.is_square import is_square
@@ -87,7 +87,7 @@ def main():
         print("\n--- Matriks A (preview) ---")
         print(matriks_a)
 
-        # === Validasi matriks A ===
+        # === Validasi matriks ===
         print("\n[Validasi Matriks A]")
         try:
             print("Persegi?    :", is_square(matriks_a.data))
@@ -95,28 +95,6 @@ def main():
             print("Identitas?  :", is_identity(matriks_a.data))
         except Exception as e:
             print(f"[WARNING] Validasi gagal: {e}")
-
-        # === Operasi tambahan walau hanya A ===
-        print("\n[Operasi Tambahan: Transpose, Determinan, dan Invers]")
-        try:
-            print("\nTranspose Matriks A:")
-            tA = transpose_matrix(matriks_a)
-            print(tA)
-        except Exception as e:
-            print(f"[ERROR] Gagal melakukan transpose: {e}")
-
-        try:
-            detA = find_determinant(matriks_a)
-            print(f"\nDeterminan Matriks A: {detA}")
-        except Exception as e:
-            print(f"[ERROR] Gagal menghitung determinan: {e}")
-
-        try:
-            invA = inverse_matrix(matriks_a)
-            print("\nInvers Matriks A:")
-            print(invA)
-        except Exception as e:
-            print(f"[ERROR] Gagal menghitung invers: {e}")
 
         # === Jika matriks B juga disediakan ===
         if b_path:
@@ -132,30 +110,88 @@ def main():
             print("\n--- Matriks B (preview) ---")
             print(matriks_b)
 
+            # === Operasi dasar ===
             print("\n--- Menjalankan Operasi: Penjumlahan & Perkalian ---")
             try:
                 hasil_penjumlahan = add_matrices(matriks_a, matriks_b)
-                print("\nHasil Penjumlahan:")
-                print_matrix(hasil_penjumlahan)
             except Exception as e:
                 print(f"[ERROR] Gagal melakukan penjumlahan: {e}", file=sys.stderr)
+                hasil_penjumlahan = None
 
+            if hasil_penjumlahan is not None:
+                print("\nHasil Penjumlahan:")
+                print_matrix(hasil_penjumlahan)
+
+            start_time = time.time()
             try:
-                start_time = time.time()
                 hasil_perkalian = multiply_matrices(matriks_a, matriks_b)
-                end_time = time.time()
+            except Exception as e:
+                print(f"[ERROR] Gagal melakukan perkalian: {e}", file=sys.stderr)
+                hasil_perkalian = None
+            end_time = time.time()
+
+            if hasil_perkalian is not None:
                 print("\nHasil Perkalian:")
                 print_matrix(hasil_perkalian)
                 print(f"\n(Waktu perkalian: {end_time - start_time:.4f} detik)")
-            except Exception as e:
-                print(f"[ERROR] Gagal melakukan perkalian: {e}", file=sys.stderr)
 
-        else:
+            # === Export hasil ===
+            if not args.no_export and hasil_penjumlahan is not None:
+                export_to_csv(hasil_penjumlahan, "hasil_penjumlahan.csv")
+                export_to_json(hasil_penjumlahan, "hasil_penjumlahan.json")
+                print("\nFile hasil disimpan: hasil_penjumlahan.csv, hasil_penjumlahan.json")
+
+        # === Operasi tambahan: transpose, determinan, invers, dan regresi linear ===
+        print("\n[Operasi Tambahan: Transpose, Determinan, Invers, dan Regresi Linear]")
+
+        try:
+            transpose_a = transpose_matrix(matriks_a)
+            print("\nTranspose Matriks A:")
+            print_matrix(transpose_a)
+        except Exception as e:
+            print(f"[ERROR] Gagal menghitung transpose: {e}")
+
+        try:
+            from operations.determinant import find_determinant
+            det_a = find_determinant(matriks_a)
+            print(f"\nDeterminan Matriks A: {det_a}")
+        except Exception as e:
+            print(f"[ERROR] Gagal menghitung determinan: {e}")
+
+        try:
+            invers_a = inverse_matrix(matriks_a)
+            print("\nInvers Matriks A:")
+            print_matrix(invers_a)
+        except Exception as e:
+            print(f"[ERROR] Gagal menghitung invers: {e}")
+
+        # === Tambahan: Regresi Linear ===
+        print("\n[Operasi Tambahan: Regresi Linear]")
+
+        try:
+            # ambil kolom pertama (x) dan kolom terakhir (y)
+            x_values = [row[0] for row in matriks_a.data]
+            y_values = [row[-1] for row in matriks_a.data]
+
+            a, b = linear_regression(x_values, y_values)
+            print(f"Persamaan regresi: y = {a:.3f} + {b:.3f}x")
+
+            # contoh prediksi
+            sample_x = [100, 150, 200]
+            pred_y = predict(sample_x, a, b)
+            print("\nContoh Prediksi:")
+            for x, y in zip(sample_x, pred_y):
+                print(f"x = {x} => y_pred = {y:.3f}")
+        except Exception as e:
+            print(f"[ERROR] Gagal menghitung regresi linear: {e}")
+
+        # === Export matriks jika tidak ada B ===
+        if not b_path:
             print("\n(Hanya matriks A yang diberikan — tidak ada operasi B.)")
             if not args.no_export:
                 export_to_csv(matriks_a, "matriks_a_copy.csv")
                 export_to_json(matriks_a, "matriks_a_copy.json")
-                print("✅ Matriks A diekspor ke: matriks_a_copy.csv, matriks_a_copy.json")
+                print(" Matriks A diekspor ke: matriks_a_copy.csv, matriks_a_copy.json")
 
     except FileNotFoundError as fe:
         print(f"[ERROR] File tidak ditemukan: {fe}", file=sys.stderr)
