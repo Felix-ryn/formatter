@@ -4,7 +4,7 @@ from validators.is_square import is_square  # opsional jika ingin validasi tamba
 
 def add_matrices(matrix1, matrix2):
     """
-    Penjumlahan dua matriks (mengembalikan Matrix).
+    Penjumlahan dua matriks : mengembalikan Matrix
     """
     if matrix1.rows != matrix2.rows or matrix1.cols != matrix2.cols:
         raise ValueError("Matriks harus memiliki dimensi yang sama untuk penjumlahan.")
