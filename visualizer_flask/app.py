@@ -1,78 +1,113 @@
-import os
 import sys
+import os
+
+# 1. Tambahkan direktori induk (formatter) ke Python path
+# Ini memastikan Python dapat menemukan 'matrix' dan 'operations'
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import pandas as pd
-import argparse
+import numpy as np
 from flask import Flask, render_template
 
-# --- Pastikan main.py bisa diimport dari folder induk ---
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
+# ====================================================================
+# PERBAIKAN IMPOR: Sekarang impor ini seharusnya stabil karena path sudah ditambahkan
+# ====================================================================
+# Kita gunakan impor langsung karena direktori induk ('formatter') sudah ada di sys.path
+try:
+    from matrix import Matrix
+    from operations.linear_regression import linear_regression, predict
+except ImportError:
+    # Ini akan menangkap jika ada masalah di dalam modul itu sendiri,
+    # tetapi tidak lagi karena masalah path. Kita biarkan saja pesan warning-nya.
+    print("Warning: Gagal mengimpor modul matrix/operations. Pastikan struktur folder sudah benar.")
+    
+    # Define dummy functions to prevent NameError later
+    def linear_regression(X, Y): raise NotImplementedError("linear_regression module failed to load.")
+    def predict(x, a, b): raise NotImplementedError("predict module failed to load.")
+    Matrix = None
 
-from main import main as run_formatter  # Sekarang pasti bisa diimport
 
 app = Flask(__name__)
 
-# Argumen CLI untuk app Flask
-def parse_args():
-    parser = argparse.ArgumentParser(description="Run Flask visualizer + formatter")
-    parser.add_argument("--a", required=True, help="Path ke CSV untuk matriks A")
-    parser.add_argument("--b", help="Path ke CSV untuk matriks B (opsional)")
-    parser.add_argument("--skip-header", action="store_true", help="Lewatkan baris header")
-    return parser.parse_args()
+# File data ada di direktori kerja saat ini (CWD: ~/formatter)
+DATA_FILE_RAW = 'matriks_a_copy.csv' 
+COLUMNS = ['Luas', 'Kamar', 'Usia', 'Harga']
+LUAS_COL_INDEX = 0
+HARGA_COL_INDEX = 3
 
+def load_and_analyze_data():
+    """Memuat data dari matriks_a_copy.csv dan menjalankan Simple Linear Regression (SLR)."""
+    # Cek impor kritis sebelum mencoba menghitung
+    if 'linear_regression' not in globals() and 'linear_regression' not in locals():
+        return None, None, {"error": "Gagal menjalankan Regresi: Modul linear_regression tidak ditemukan (ImportError)." }
 
-def run_formatter_once(args):
-    """
-    Jalankan seluruh proses di main.py satu kali sebelum Flask aktif.
-    """
     try:
-        print(f"[INFO] Menjalankan formatter untuk: {args.a}")
-        sys_argv_backup = sys.argv.copy()
-        sys.argv = ["main.py", "--a", args.a]
-        if args.b:
-            sys.argv += ["--b", args.b]
-        if args.skip_header:
-            sys.argv += ["--skip-header"]
-        run_formatter()  # Panggil langsung fungsi main()
-        sys.argv = sys_argv_backup
-    except Exception as e:
-        print(f"[ERROR] Gagal menjalankan formatter: {e}")
-
-
-# Lokasi default hasil ekspor CSV
-CSV_FILE_PATH = os.path.join(BASE_DIR, "matriks_a_copy.csv")
-
-def get_chart_data():
-    """
-    Memuat data CSV dan mengembalikan dict untuk Chart.js
-    """
-    try:
-        df = pd.read_csv(CSV_FILE_PATH, header=None)
-        labels = df[0].astype(str).tolist()
-        values = df.iloc[:, -1].tolist()  # Kolom terakhir sebagai nilai
-        chart_data = {
-            "labels": labels,
-            "data_values": values,
-            "dataset_label": "Nilai Matriks (Kolom Terakhir)"
-        }
-        return chart_data
+        # Menggunakan pandas untuk memuat data tanpa header
+        df = pd.read_csv(DATA_FILE_RAW, header=None) 
+        df.columns = COLUMNS # Beri nama kolom secara manual
     except FileNotFoundError:
-        print(f"[ERROR] File CSV tidak ditemukan di {CSV_FILE_PATH}")
-        return {"labels": ["Error"], "data_values": [0], "dataset_label": "File Not Found"}
+        import os
+        return None, None, {"error": f"File data {DATA_FILE_RAW} tidak ditemukan di {os.getcwd()}."}
     except Exception as e:
-        print(f"[ERROR] Kesalahan saat memproses data: {e}")
-        return {"labels": ["Error"], "data_values": [0], "dataset_label": "Data Error"}
+         return None, None, {"error": f"Gagal membaca data: {e}"}
 
+    # Ambil kolom Luas (index 0) dan Harga (index 3)
+    X_luas = df[COLUMNS[LUAS_COL_INDEX]].tolist()
+    Y_harga = df[COLUMNS[HARGA_COL_INDEX]].tolist()
 
-@app.route("/")
+    # Hitung Simple Linear Regression (SLR)
+    try:
+        a, b = linear_regression(X_luas, Y_harga)
+    except NotImplementedError as e:
+        return None, None, {"error": f"Kesalahan Regresi: {e}. Modul gagal dimuat."}
+    except Exception as e:
+        return None, None, {"error": f"Kesalahan saat menghitung Regresi: {e}"}
+    
+    model_slr = {
+        'intercept': f"{a:.3f}",
+        'slope_luas': f"{b:.3f}",
+        'equation': f"Harga = {a:.3f} + {b:.3f} * Luas"
+    }
+    
+    preview_df = df.head(10)
+    return df, model_slr, preview_df
+
+@app.route('/')
 def index():
-    data_dict = get_chart_data()
-    return render_template("index.html", chart_data=data_dict)
+    df, model_slr, preview_df = load_and_analyze_data()
+    
+    if df is None:
+        return render_template('index.html', model_slr=None, preview_data=preview_df)
 
+    # Siapkan data untuk Chart.js (hanya Luas dan Harga)
+    try:
+        chart_data = {
+            'luas': df[COLUMNS[LUAS_COL_INDEX]].tolist(),
+            'harga': df[COLUMNS[HARGA_COL_INDEX]].tolist(),
+            'prediksi': [predict(x, float(model_slr['intercept']), float(model_slr['slope_luas']))[0] 
+                        for x in df[COLUMNS[LUAS_COL_INDEX]].tolist()]
+        }
+    except Exception:
+        # Jika predict gagal (karena modul tidak dimuat), kirim data mentah saja
+        chart_data = {
+            'luas': df[COLUMNS[LUAS_COL_INDEX]].tolist(),
+            'harga': df[COLUMNS[HARGA_COL_INDEX]].tolist(),
+            'prediksi': []
+        }
 
-if __name__ == "__main__":
-    args = parse_args()
-    run_formatter_once(args)
-    print("[INFO] Menjalankan Flask server...")
+    # Siapkan data preview sebagai list of lists untuk template
+    preview_data = {
+        'headers': preview_df.columns.tolist(),
+        'rows': preview_df.values.tolist()
+    }
+
+    return render_template(
+        'index.html',
+        model_slr=model_slr,
+        preview_data=preview_data,
+        chart_data=chart_data
+    )
+
+if __name__ == '__main__':
+    # Hapus pesan debugging yang berlebihan di akhir
     app.run(debug=True)
