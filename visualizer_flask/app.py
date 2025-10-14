@@ -109,5 +109,4 @@ def index():
     )
 
 if __name__ == '__main__':
-    # Hapus pesan debugging yang berlebihan di akhir
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

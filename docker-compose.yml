@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  formatter:
+    build: .
+    container_name: formatter_app
+    volumes:
+      - .:/app
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RUN_MODE=flask  # ubah ke "cli" kalau mau mode main.py
+    tty: true
