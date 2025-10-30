@@ -1,65 +1,87 @@
 # main.py
+# Program utama untuk memuat matriks dari file CSV, melakukan operasi matriks,
+# validasi sifat matriks, dan menjalankan regresi linear sederhana & multiple.
 
 import os
 import argparse
 import sys
 import time
 
-#import kelas matrix
+# Import class Matrix untuk merepresentasikan matriks
 from matrix import Matrix
 
-# === Import dari package internal ===
-from utilities.csv_loader import load_matrix_from_csv
-from utilities.formatter import print_matrix
-from operations.adder import add_matrices
-from operations.subtractor import subtract_matrices # Import Subtractor
-from operations.multiplier import multiply_matrices
-from exporters.csv_exporter import export_to_csv
-from exporters.json_exporter import export_to_json
-from operations.inverse import inverse_matrix
-from operations.transpose import transpose_matrix
-# Import kedua fungsi regresi
-from operations.linear_regression import linear_regression, predict, multiple_linear_regression 
+# === Import utility untuk input & output data ===
+from utilities.csv_loader import load_matrix_from_csv       # Load CSV menjadi Matrix / SparseMatrix
+from utilities.formatter import print_matrix                # Format tampilan matriks ke console
 
-# === Import validator baru ===
+# === Import operasi dasar matriks ===
+from operations.adder import add_matrices                   # Penjumlahan matriks
+from operations.subtractor import subtract_matrices         # Pengurangan matriks
+from operations.multiplier import multiply_matrices         # Perkalian matriks
+from operations.inverse import inverse_matrix               # Invers matriks
+from operations.transpose import transpose_matrix           # Transpose matriks
+
+# === Import operasi regresi ===
+from operations.linear_regression import linear_regression, predict, multiple_linear_regression
+
+# === Import validator matriks ===
 from validators.is_square import is_square
 from validators.is_symmetric import is_symmetric
 from validators.is_identity import is_identity
 
 
 def normalize_wsl_path(path: str) -> str:
+    """
+    Menormalkan path ketika mengambil file dari Windows Subsystem for Linux (WSL).
+    Mengubah path UNC Windows menjadi path POSIX jika perlu.
+    """
     if not path:
         return path
     p = path.strip()
+
+    # Path UNC WSL -> ubah menjadi format Linux
     if p.startswith("\\\\wsl.localhost\\") or p.startswith("\\\\wsl$\\"):
         parts = p.split("\\")
         if len(parts) >= 5:
             rest = parts[4:]
             return "/" + "/".join(rest)
         return p.replace("\\", "/")
+
+    # Jika dijalankan di Linux tapi path mengandung backslash → ubah ke slash
     if os.name == "posix" and "\\" in p:
         return p.replace("\\", "/")
+
     return p
 
 
 def parse_args():
+    """
+    Mengambil parameter dari command-line seperti:
+    - lokasi file input matriks,
+    - opsi sparse,
+    - strategi imputasi,
+    - opsi normalisasi.
+    """
     p = argparse.ArgumentParser(description="Load CSV(s) and run matrix operations.")
-    p.add_argument("--a", required=True, help="Path ke CSV untuk matriks A (UNC WSL atau POSIX).")
+    p.add_argument("--a", required=True, help="Path ke CSV untuk matriks A.")
     p.add_argument("--b", help="Path ke CSV untuk matriks B (opsional).")
-    p.add_argument("--delimiter", help="CSV delimiter (default: comma). Jika tab gunakan '\\t'.", default=None)
-    # Ubah action menjadi store_true, dan pengguna harus menambahkan flag --skip-header untuk house_multifeature.csv
-    p.add_argument("--skip-header", action="store_true", help="Lewatkan baris header pada CSV.") 
-    p.add_argument("--as-sparse", action="store_true", help="Paksa loader mengembalikan SparseMatrix.")
-    p.add_argument("--sparse-threshold", type=float, default=0.5, help="Threshold proporsi nol untuk deteksi sparse.")
+    p.add_argument("--delimiter", default=None, help="Delimiter CSV (default koma).")
+    p.add_argument("--skip-header", action="store_true", help="Lewatkan baris header CSV.")
+    p.add_argument("--as-sparse", action="store_true", help="Paksa matriks dimuat sebagai SparseMatrix.")
+    p.add_argument("--sparse-threshold", type=float, default=0.5,
+                   help="Jika proporsi nol > threshold, pakai SparseMatrix otomatis.")
     p.add_argument("--impute", choices=["zero", "mean", "median", "drop"], default="zero",
-                      help="Strategi imputasi untuk nilai kosong/non-numeric (default: zero).")
+                   help="Strategi isi nilai hilang.")
     p.add_argument("--normalize", choices=["minmax", "zscore"], default=None,
-                      help="Normalisasi kolom numeric setelah imputasi.")
-    p.add_argument("--no-export", action="store_true", help="Jangan export hasil ke file.")
+                   help="Normalisasi kolom numerik.")
+    p.add_argument("--no-export", action="store_true", help="Matikan ekspor hasil ke file.")
     return p.parse_args()
 
 
 def make_abs_and_normalize(path: str) -> str:
+    """
+    Normalisasi path + pastikan path berupa absolute path.
+    """
     if not path:
         return path
     normalized = normalize_wsl_path(path)
@@ -69,9 +91,11 @@ def make_abs_and_normalize(path: str) -> str:
 
 
 def main():
+    # Ambil semua argumen
     args = parse_args()
 
     try:
+        # Normalisasi path file input
         a_path = make_abs_and_normalize(args.a)
         b_path = make_abs_and_normalize(args.b) if args.b else None
 
@@ -79,7 +103,7 @@ def main():
         if b_path:
             print(f"Loading B from: {b_path}")
 
-        # === Load matriks A ===
+        # === Load matriks A dengan opsi imputasi, normalisasi, dan deteksi sparse ===
         matriks_a = load_matrix_from_csv(
             a_path,
             delimiter=args.delimiter,
@@ -93,16 +117,13 @@ def main():
         print("\n--- Matriks A (preview) ---")
         print(matriks_a)
 
-        # === Validasi matriks ===
+        # === Validasi sifat matriks A ===
         print("\n[Validasi Matriks A]")
-        try:
-            print("Persegi?    :", is_square(matriks_a.data))
-            print("Simetris?   :", is_symmetric(matriks_a.data))
-            print("Identitas?  :", is_identity(matriks_a.data))
-        except Exception as e:
-            print(f"[WARNING] Validasi gagal (kemungkinan karena matriks besar): {e}")
+        print("Persegi?    :", is_square(matriks_a.data))
+        print("Simetris?   :", is_symmetric(matriks_a.data))
+        print("Identitas?  :", is_identity(matriks_a.data))
 
-        # === Jika matriks B juga disediakan ===
+        # === Jika ada Matriks B ===
         if b_path:
             matriks_b = load_matrix_from_csv(
                 b_path,
@@ -113,51 +134,48 @@ def main():
                 as_sparse=args.as_sparse,
                 sparse_threshold=args.sparse_threshold
             )
+
             print("\n--- Matriks B (preview) ---")
             print(matriks_b)
 
-            # === Operasi dasar: Penjumlahan, Pengurangan, & Perkalian ===
-            print("\n--- Menjalankan Operasi: Penjumlahan, Pengurangan, & Perkalian ---")
-            
-            # Addition
+            print("\n--- Operasi Matriks (A & B) ---")
+
+            # Penjumlahan
             try:
                 hasil_penjumlahan = add_matrices(matriks_a, matriks_b)
                 print("\nHasil Penjumlahan:")
                 print_matrix(hasil_penjumlahan)
             except Exception as e:
-                print(f"[ERROR] Gagal melakukan penjumlahan: {e}", file=sys.stderr)
+                print(f"[ERROR] Penjumlahan gagal: {e}")
                 hasil_penjumlahan = None
 
-            # Subtraction
+            # Pengurangan
             try:
                 hasil_pengurangan = subtract_matrices(matriks_a, matriks_b)
                 print("\nHasil Pengurangan:")
                 print_matrix(hasil_pengurangan)
             except Exception as e:
-                print(f"[ERROR] Gagal melakukan pengurangan: {e}", file=sys.stderr)
+                print(f"[ERROR] Pengurangan gagal: {e}")
                 hasil_pengurangan = None
 
-
-            # Multiplication
-            start_time = time.time()
+            # Perkalian
             try:
+                start = time.time()
                 hasil_perkalian = multiply_matrices(matriks_a, matriks_b)
                 print("\nHasil Perkalian:")
                 print_matrix(hasil_perkalian)
-                print(f"\n(Waktu perkalian: {time.time() - start_time:.4f} detik)")
+                print(f"\nWaktu eksekusi perkalian: {time.time() - start:.4f} detik")
             except Exception as e:
-                print(f"[ERROR] Gagal melakukan perkalian: {e}", file=sys.stderr)
-                hasil_perkalian = None
+                print(f"[ERROR] Perkalian gagal: {e}")
 
-            # === Export hasil ===
+            # Export hasil (jika tidak dinonaktifkan)
             if not args.no_export and hasil_penjumlahan is not None:
                 export_to_csv(hasil_penjumlahan, "hasil_penjumlahan.csv")
                 export_to_json(hasil_penjumlahan, "hasil_penjumlahan.json")
-                print("\nFile hasil disimpan: hasil_penjumlahan.csv, hasil_penjumlahan.json")
+                print("\nHasil diexport ke: hasil_penjumlahan.csv & hasil_penjumlahan.json")
 
-
-        # === Operasi tambahan: transpose, determinan, invers ===
-        print("\n[Operasi Tambahan: Transpose, Determinan, Invers]")
+        # === Operasi tambahan pada Matriks A ===
+        print("\n[Operasi Tambahan]")
 
         # Transpose
         try:
@@ -165,108 +183,65 @@ def main():
             print("\nTranspose Matriks A:")
             print_matrix(transpose_a)
         except Exception as e:
-            print(f"[ERROR] Gagal menghitung transpose: {e}")
-        
-        # Determinan dan Invers (Hanya jika matriks kecil dan persegi)
-        if matriks_a.rows <= 3 and matriks_a.cols == matriks_a.rows:
+            print(f"[ERROR] Transpose gagal: {e}")
+
+        # Determinan & Invers hanya untuk matriks kecil (2x2 atau 3x3)
+        if matriks_a.rows <= 3 and matriks_a.rows == matriks_a.cols:
+            from operations.determinant import find_determinant
             try:
-                from operations.determinant import find_determinant
-                det_a = find_determinant(matriks_a)
-                print(f"\nDeterminan Matriks A: {det_a}")
-            except Exception as e:
-                print(f"[ERROR] Gagal menghitung determinan: {e}")
+                print(f"\nDeterminan Matriks A: {find_determinant(matriks_a)}")
+            except:
+                print("[ERROR] Gagal menghitung determinan")
 
             try:
-                invers_a = inverse_matrix(matriks_a)
                 print("\nInvers Matriks A:")
-                print_matrix(invers_a)
-            except Exception as e:
-                print(f"[ERROR] Gagal menghitung invers: {e}")
+                print_matrix(inverse_matrix(matriks_a))
+            except:
+                print("[ERROR] Gagal menghitung invers")
         else:
-             print("\n[INFO] Determinan/Inverse diskip: Matriks A bukan 2x2 atau 3x3 persegi.")
+            print("\n[INFO] Determinan dan invers dilewati: Matriks tidak persegi kecil.")
 
+        # === Regresi Linear ===
+        if matriks_a.rows >= 2 and matriks_a.cols >= 2:
+            print("\n--- Regresi Linear Sederhana (kolom 0 vs kolom terakhir) ---")
 
-        # === Tambahan: Regresi Linear ===
-        
-        if matriks_a.rows < 2 or matriks_a.cols < 2:
-             print("\n[ERROR] Matriks terlalu kecil untuk regresi.")
-        else:
-            # --- 1. Regresi Linear Sederhana (Simple LR) ---
-            print("\n--- Simple Linear Regression (Luas vs. Harga) ---")
-            try:
-                # Kolom 0 = Luas (X); Kolom -1 = Harga (Y)
-                x_values = [row[0] for row in matriks_a.data]
-                y_values = [row[-1] for row in matriks_a.data]
+            # Ambil kolom X & Y
+            x_values = [row[0] for row in matriks_a.data]
+            y_values = [row[-1] for row in matriks_a.data]
 
-                a, b = linear_regression(x_values, y_values)
-                print(f"Persamaan regresi: y (Harga) = {a:.3f} + {b:.3f}x (Luas)")
+            # Hitung model
+            a, b = linear_regression(x_values, y_values)
+            print(f"Model: y = {a:.3f} + {b:.3f}x")
 
-                # contoh prediksi
-                sample_x = [100, 150, 200]
-                pred_y = predict(sample_x, a, b)
-                print("\nContoh Prediksi:")
-                for x, y in zip(sample_x, pred_y):
-                    print(f"Luas = {x} => Harga_prediksi = {y:.3f}")
-            except Exception as e:
-                print(f"[ERROR] Gagal menghitung Simple Linear Regression: {e}")
-                
-            # --- 2. Multiple Linear Regression (MLR) ---
-            print("\n--- Multiple Linear Regression (Luas, Kamar, Usia vs. Harga) ---")
-            try:
-                # Persiapan data: X_features = [Luas, Kamar, Usia], Y_target = [Harga]
-                # Matriks A (4 kolom): [X1, X2, X3, Y]
-                X_data = [row[:-1] for row in matriks_a.data] # Ambil semua kolom kecuali yang terakhir (Fitur)
-                Y_data = [[row[-1]] for row in matriks_a.data] # Ambil kolom terakhir sebagai vektor kolom (Target)
+            print("\nContoh prediksi:")
+            for x, y_pred in zip([100, 150, 200], predict([100, 150, 200], a, b)):
+                print(f"x={x} → y_pred={y_pred:.3f}")
 
-                # Tambahkan kolom intercept (bias) '1' di depan X_data
-                X_data_bias = [[1.0] + row for row in X_data]
-                
-                X_MLR = Matrix(X_data_bias)
-                Y_MLR = Matrix(Y_data)
-                
-                print(f"Dimensi X_MLR (dengan bias): {X_MLR.rows}x{X_MLR.cols}")
-                
-                Beta = multiple_linear_regression(X_MLR, Y_MLR)
-                
-                if isinstance(Beta, str):
-                    # Menangkap pesan error dari fungsi MLR (biasanya error invers)
-                    print(f"\n[HASIL MLR TIDAK DAPAT DIHITUNG]: {Beta}") 
-                else:
-                    # Beta akan berbentuk Matriks 4x1: [b0, b1, b2, b3]
-                    b0 = Beta.data[0][0] # Intercept
-                    b1 = Beta.data[1][0] # Koefisien Luas
-                    b2 = Beta.data[2][0] # Koefisien Kamar
-                    b3 = Beta.data[3][0] # Koefisien Usia
+            # === Multiple Linear Regression ===
+            print("\n--- Multiple Linear Regression ---")
+            X = [[1.0] + row[:-1] for row in matriks_a.data]  # Tambah bias
+            Y = [[row[-1]] for row in matriks_a.data]
 
-                    print("\nHasil Multiple Linear Regression (Koefisien Beta):")
-                    print(f"Intercept (b0): {b0:.3f}")
-                    print(f"Luas (b1): {b1:.3f}")
-                    print(f"Kamar (b2): {b2:.3f}")
-                    print(f"Usia (b3): {b3:.3f}")
-                    print(f"\nModel: Harga = {b0:.3f} + {b1:.3f}*Luas + {b2:.3f}*Kamar + {b3:.3f}*Usia")
-                    
-            except Exception as e:
-                print(f"[ERROR] Gagal menghitung Multiple Linear Regression (Umum): {e}")
-                print(f"[PETUNJUK] Periksa apakah operasi inverse_matrix Anda mendukung matriks {X_MLR.cols}x{X_MLR.cols}.")
+            X_MLR = Matrix(X)
+            Y_MLR = Matrix(Y)
 
+            Beta = multiple_linear_regression(X_MLR, Y_MLR)
 
-        # === Export matriks jika tidak ada B ===
-        if not b_path:
-            print("\n(Hanya matriks A yang diberikan — tidak ada operasi B.)")
-            if not args.no_export:
-                export_to_csv(matriks_a, "matriks_a_copy.csv")
-                export_to_json(matriks_a, "matriks_a_copy.json")
-                print(" Matriks A diekspor ke: matriks_a_copy.csv, matriks_a_copy.json")
+            if isinstance(Beta, str):
+                print(f"[ERROR] Tidak dapat menghitung MLR: {Beta}")
+            else:
+                b0, b1, b2, b3 = [Beta.data[i][0] for i in range(4)]
+                print(f"\nModel: Harga = {b0:.3f} + {b1:.3f}*Luas + {b2:.3f}*Kamar + {b3:.3f}*Usia")
 
-    except FileNotFoundError as fe:
-        print(f"[ERROR] File tidak ditemukan: {fe}", file=sys.stderr)
-        sys.exit(2)
-    except ValueError as ve:
-        print(f"[ERROR] Value error saat memproses file: {ve}", file=sys.stderr)
-        sys.exit(3)
+        # Jika hanya matriks A yang diberikan, export langsung
+        if not b_path and not args.no_export:
+            export_to_csv(matriks_a, "matriks_a_copy.csv")
+            export_to_json(matriks_a, "matriks_a_copy.json")
+            print("\nMatriks A diekspor ke: matriks_a_copy.csv & matriks_a_copy.json")
+
     except Exception as e:
-        print(f"[ERROR] Exception: {e}", file=sys.stderr)
-        sys.exit(4)
+        print(f"[ERROR] Program berhenti: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -17,84 +17,100 @@ import statistics
 from matrix import Matrix
 from sparsematrix import SparseMatrix
 
+# Tipe data untuk angka
 Number = Union[int, float]
 
+# ------------------------------------------------------------
+# Fungsi bantuan: mencoba mengubah string menjadi angka jika memungkinkan
+# ------------------------------------------------------------
 def _to_number_if_possible(s: str) -> Optional[Number]:
     s = s.strip()
     if s == "":
         return None
-    # coba int dulu
     try:
-        v = int(s)
-        return v
+        return int(s)    # coba konversi ke int
     except ValueError:
         try:
-            v = float(s)
-            return v
+            return float(s)  # jika gagal, coba konversi ke float
         except ValueError:
-            return None
+            return None  # jika gagal juga, berarti bukan angka
 
+# ------------------------------------------------------------
+# Cek apakah kolom adalah kolom numerik
+# ------------------------------------------------------------
 def _is_column_numeric(col_values: List[str]) -> bool:
-    # kolom numeric jika setidaknya satu non-empty dan semua non-empty bisa diubah ke number
+    # Ambil nilai yang tidak kosong
     non_empty = [v for v in col_values if v.strip() != ""]
     if not non_empty:
         return False
-    for v in non_empty:
-        if _to_number_if_possible(v) is None:
-            return False
-    return True
+    # Jika setiap nilai tak kosong dapat dikonversi ke angka → kolom dianggap numerik
+    return all(_to_number_if_possible(v) is not None for v in non_empty)
 
-def _parse_rows(path: str, delimiter: Optional[str], skip_header: bool) -> (List[str], List[List[str]]):
+# ------------------------------------------------------------
+# Membaca baris CSV dan memisahkan header jika ada
+# ------------------------------------------------------------
+def _parse_rows(path: str, delimiter: Optional[str], skip_header: bool):
     if not os.path.exists(path):
         raise FileNotFoundError(path)
+
     with open(path, newline='') as f:
         reader = csv.reader(f, delimiter=delimiter) if delimiter else csv.reader(f)
         rows = list(reader)
+
     if not rows:
         return [], []
+
     header = []
     start = 0
+
+    # Jika skip_header = True → baris pertama dianggap header
     if skip_header:
         header = [h.strip() for h in rows[0]]
         start = 1
+
+    # Buang baris kosong
     data_rows = [r for r in rows[start:] if any(cell.strip() != "" for cell in r)]
-    # ensure rectangular by padding empties to same length as first row
+
+    # Pastikan semua baris memiliki panjang yang sama
     maxlen = max((len(r) for r in data_rows), default=0)
-    data_rows = [r + [""]*(maxlen - len(r)) for r in data_rows]
+    data_rows = [r + [""] * (maxlen - len(r)) for r in data_rows]
+
     return header, data_rows
 
+# ------------------------------------------------------------
+# Memilih kolom berdasarkan nama (jika header) atau indeks
+# ------------------------------------------------------------
 def _select_columns_by_names_or_indices(header: List[str], selected: Optional[Iterable[Union[int,str]]]) -> List[int]:
     if not selected:
         return list(range(len(header))) if header else []
+
     sel_indices = []
     for s in selected:
         if isinstance(s, int):
             sel_indices.append(s)
         else:
-            # string: try to find in header
             if s in header:
                 sel_indices.append(header.index(s))
             else:
                 raise ValueError(f"Selected column name '{s}' not found in header.")
     return sel_indices
 
+# ------------------------------------------------------------
+# Konversi kolom ke angka + imputasi nilai kosong
+# ------------------------------------------------------------
 def _convert_and_impute(columns: List[List[str]], strategy: str) -> List[Optional[List[Number]]]:
-    numeric_cols = []
-    for col in columns:
-        # convert to numbers or None
-        conv = [_to_number_if_possible(v) for v in col]
-        numeric_cols.append(conv)
-
-    # imputasi per kolom
+    numeric_cols = [[_to_number_if_possible(v) for v in col] for col in columns]
     result = []
+
     for conv in numeric_cols:
         non_null = [v for v in conv if v is not None]
-        if strategy == "drop":
-            if any(v is None for v in conv):
-                # drop entire column by signalling with None
-                result.append(None)
-                continue
-        fill = 0
+
+        # Jika strategi = drop dan ada nilai kosong → drop kolom
+        if strategy == "drop" and any(v is None for v in conv):
+            result.append(None)
+            continue
+
+        # Tentukan nilai pengganti (fill)
         if strategy == "zero":
             fill = 0
         elif strategy == "mean":
@@ -104,127 +120,95 @@ def _convert_and_impute(columns: List[List[str]], strategy: str) -> List[Optiona
         else:
             raise ValueError(f"Unknown impute strategy: {strategy}")
 
-        filled = [ (v if v is not None else fill) for v in conv ]
-        # If all entries are int-like, cast to int when possible
-        casted = []
-        for x in filled:
-            if isinstance(x, float) and abs(x - int(x)) < 1e-9:
-                casted.append(int(round(x)))
-            else:
-                casted.append(x)
+        # Ganti nilai None dengan nilai imputasi
+        filled = [v if v is not None else fill for v in conv]
+
+        # Jika float tapi angkanya bulat → ubah ke int
+        casted = [int(round(x)) if isinstance(x, float) and abs(x - int(x)) < 1e-9 else x for x in filled]
         result.append(casted)
+
     return result
 
+# ------------------------------------------------------------
+# Transpose kolom menjadi baris
+# ------------------------------------------------------------
 def _transpose(cols: List[List[Number]]) -> List[List[Number]]:
     if not cols:
         return []
-    nrows = len(cols[0])
-    ncols = len(cols)
-    rows = [[cols[c][r] for c in range(ncols)] for r in range(nrows)]
-    return rows
+    return [[cols[c][r] for c in range(len(cols))] for r in range(len(cols[0]))]
 
+# ------------------------------------------------------------
+# Normalisasi Min-Max
+# ------------------------------------------------------------
 def _minmax_scale(cols: List[List[Number]]) -> List[List[Number]]:
     scaled = []
     for col in cols:
-        if not col:
-            scaled.append(col)
-            continue
-        mn = min(col)
-        mx = max(col)
-        if mx == mn:
-            scaled.append([0.0 for _ in col])
-        else:
-            scaled.append([ (x - mn) / (mx - mn) for x in col ])
+        mn, mx = min(col), max(col)
+        scaled.append([0.0 if mx == mn else (x - mn) / (mx - mn) for x in col])
     return scaled
 
+# ------------------------------------------------------------
+# Normalisasi Z-Score
+# ------------------------------------------------------------
 def _zscore_scale(cols: List[List[Number]]) -> List[List[Number]]:
     scaled = []
     for col in cols:
-        if not col:
-            scaled.append(col)
-            continue
         mu = statistics.mean(col)
         stdev = statistics.pstdev(col)
-        if stdev == 0:
-            scaled.append([0.0 for _ in col])
-        else:
-            scaled.append([ (x - mu) / stdev for x in col ])
+        scaled.append([0.0 if stdev == 0 else (x - mu) / stdev for x in col])
     return scaled
 
+# ------------------------------------------------------------
+# Fungsi utama: Load CSV menjadi Matrix atau SparseMatrix
+# ------------------------------------------------------------
 def load_matrix_from_csv(
     path: str,
     delimiter: Optional[str] = None,
     skip_header: bool = False,
     selected_columns: Optional[Iterable[Union[int,str]]] = None,
     drop_non_numeric: bool = True,
-    impute_strategy: str = "zero",   # "zero" | "mean" | "median" | "drop"
-    normalize: Optional[str] = None, # None | "minmax" | "zscore"
+    impute_strategy: str = "zero",
+    normalize: Optional[str] = None,
     as_sparse: bool = False,
     sparse_threshold: float = 0.5
 ) -> Union[Matrix, SparseMatrix]:
-    """
-    Baca CSV dan kembalikan Matrix atau SparseMatrix yang telah diproses.
-    - selected_columns: iterable of column indices or names (names hanya jika skip_header=True)
-    - drop_non_numeric: jika True akan membuang kolom non-numerik (lainnya error)
-    """
+
     header, data_rows = _parse_rows(path, delimiter, skip_header)
     if not data_rows:
-        return Matrix([]) if not as_sparse else SparseMatrix({})
+        return SparseMatrix({}) if as_sparse else Matrix([])
 
-    ncols = len(data_rows[0])
-    # build columns as strings
-    cols = [ [row[c] if c < len(row) else "" for row in data_rows] for c in range(ncols) ]
+    # Bentuk kolom dari data
+    cols = [[row[c] for row in data_rows] for c in range(len(data_rows[0]))]
 
-    # select columns if requested
+    # Pilih kolom tertentu jika diminta
     if selected_columns:
-        if skip_header:
-            # allow name or index
-            sel_indices = _select_columns_by_names_or_indices(header, selected_columns)
-        else:
-            # selected must be indices
-            sel_indices = [int(x) for x in selected_columns]
-        cols = [cols[i] for i in sel_indices]
+        cols = [cols[i] for i in (_select_columns_by_names_or_indices(header, selected_columns) if skip_header else map(int, selected_columns))]
 
-    # detect numeric columns
+    # Deteksi kolom numerik
     numeric_mask = [_is_column_numeric(col) for col in cols]
 
     if not all(numeric_mask):
         if drop_non_numeric:
             cols = [col for col, ok in zip(cols, numeric_mask) if ok]
-            numeric_mask = [True]*len(cols)
         else:
-            bad_idxs = [i for i,ok in enumerate(numeric_mask) if not ok]
-            raise ValueError(f"Terdapat kolom non-numerik pada indeks: {bad_idxs}. Gunakan drop_non_numeric=True atau selected_columns untuk memilih kolom numerik.")
+            raise ValueError("Terdapat kolom non-numerik. Gunakan drop_non_numeric=True atau pilih kolom secara manual.")
 
-    # convert and impute
-    converted_cols = _convert_and_impute(cols, impute_strategy)
-    # _convert_and_impute may signal drop for columns -> remove those
-    converted_cols = [c for c in converted_cols if c is not None]
+    # Konversi + imputasi
+    converted_cols = [c for c in _convert_and_impute(cols, impute_strategy) if c is not None]
 
-    # normalize if requested
+    # Normalisasi jika diminta
     if normalize == "minmax":
         converted_cols = _minmax_scale(converted_cols)
     elif normalize == "zscore":
         converted_cols = _zscore_scale(converted_cols)
-    elif normalize is None:
-        pass
-    else:
-        raise ValueError("normalize must be one of None, 'minmax', 'zscore'")
 
-    # transpose to rows
+    # Ubah orientasi → baris
     rows = _transpose(converted_cols)
 
-    # decide sparse or dense
-    total = len(rows) * (len(rows[0]) if rows else 0)
-    zero_count = sum(1 for r in rows for v in r if v == 0)
-    zero_ratio = (zero_count / total) if total > 0 else 0.0
+    # Tentukan apakah perlu sparse
+    total = len(rows) * len(rows[0])
+    zero_ratio = sum(v == 0 for r in rows for v in r) / total if total else 0
 
     if as_sparse or zero_ratio >= sparse_threshold:
-        sparse_dict = {}
-        for i, row in enumerate(rows):
-            for j, val in enumerate(row):
-                if val != 0:
-                    sparse_dict[(i, j)] = val
-        return SparseMatrix(sparse_dict)
-    else:
-        return Matrix(rows)
+        return SparseMatrix({(i, j): v for i, r in enumerate(rows) for j, v in enumerate(r) if v != 0})
+    return Matrix(rows)

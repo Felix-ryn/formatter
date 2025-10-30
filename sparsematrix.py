@@ -4,6 +4,13 @@
 from validators.is_square import is_square
 from validators.is_symmetric import is_symmetric
 
+"""
+Modul ini berisi kelas SparseMatrix dengan komentar diperluas.
+SparseMatrix menyimpan hanya elemen yang bukan nol dalam bentuk kamus (dict)
+untuk menghemat memori dan mempercepat operasi tertentu.
+Penambahan komentar dilakukan agar setiap bagian kode lebih mudah dipahami.
+"""
+
 class SparseMatrix:
     """
     Representasi matriks jarang (sparse).
@@ -33,7 +40,6 @@ class SparseMatrix:
 
     @property
     def data(self):
-        """Return dense representation (list of lists)."""
         if self._dense_cache is not None:
             return self._dense_cache
         dense = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
@@ -43,11 +49,9 @@ class SparseMatrix:
         return self._dense_cache
 
     def is_square(self):
-        """Periksa apakah matriks persegi."""
         return is_square(self.data)
 
     def is_symmetric(self):
-        """Periksa apakah matriks simetris."""
         return is_symmetric(self.data)
 
     def get_value(self, row, col):
