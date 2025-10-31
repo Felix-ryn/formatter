@@ -29,6 +29,11 @@ from validators.is_square import is_square
 from validators.is_symmetric import is_symmetric
 from validators.is_identity import is_identity
 
+#fungsi eksporter
+from exporters.csv_exporter import export_to_csv
+from exporters.json_exporter import export_to_json
+
+
 
 def normalize_wsl_path(path: str) -> str:
     """
