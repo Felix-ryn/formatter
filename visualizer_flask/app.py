@@ -30,7 +30,7 @@ except ImportError:
 app = Flask(__name__)
 
 # File data ada di direktori kerja saat ini (CWD: ~/formatter)
-DATA_FILE_RAW = 'matriks_a_copy.csv' 
+DATA_FILE_RAW  =  r"/home/felix_ryan/formatter/matriks_a_copy.csv"
 COLUMNS = ['Luas', 'Kamar', 'Usia', 'Harga']
 LUAS_COL_INDEX = 0
 HARGA_COL_INDEX = 3
@@ -77,7 +77,7 @@ def index():
     df, model_slr, preview_df = load_and_analyze_data()
     
     if df is None:
-        return render_template('index.html', model_slr=None, preview_data=preview_df)
+        return render_template('index.html', model_slr=None, preview_data=preview_df,chart_data={})
 
     # Siapkan data untuk Chart.js (hanya Luas dan Harga)
     try:

@@ -6,6 +6,7 @@ import os
 import argparse
 import sys
 import time
+from typing import Any
 
 # Import class Matrix untuk merepresentasikan matriks
 from matrix import Matrix
@@ -18,21 +19,21 @@ from utilities.formatter import print_matrix                # Format tampilan ma
 from operations.adder import add_matrices                   # Penjumlahan matriks
 from operations.subtractor import subtract_matrices         # Pengurangan matriks
 from operations.multiplier import multiply_matrices         # Perkalian matriks
-from operations.inverse import inverse_matrix               # Invers matriks
+from operations.inverse import inverse_matrix               # Invers matriks (dipakai hanya untuk matriks kecil)
 from operations.transpose import transpose_matrix           # Transpose matriks
 
-# === Import operasi regresi ===
-from operations.linear_regression import linear_regression, predict, multiple_linear_regression
+# === Import Regresi / MLR (gunakan mlr.py yang memakai pseudo-inverse) ===
+from operations.linear_regression import linear_regression, predict
+import operations.mlr as mlr_module  # multiple_linear_regression ada di sini (pakai pinv)
 
 # === Import validator matriks ===
 from validators.is_square import is_square
 from validators.is_symmetric import is_symmetric
 from validators.is_identity import is_identity
 
-#fungsi eksporter
+# fungsi eksporter
 from exporters.csv_exporter import export_to_csv
 from exporters.json_exporter import export_to_json
-
 
 
 def normalize_wsl_path(path: str) -> str:
@@ -95,6 +96,18 @@ def make_abs_and_normalize(path: str) -> str:
     return normalized
 
 
+def _print_matrix_or_obj(name: str, obj: Any):
+    """
+    Helper: jika obj punya attribute .data (Matrix-like) gunakan print_matrix,
+    kalau bukan, print biasa.
+    """
+    print(f"\n{name}")
+    if hasattr(obj, "data"):
+        print_matrix(obj)
+    else:
+        print(obj)
+
+
 def main():
     # Ambil semua argumen
     args = parse_args()
@@ -120,7 +133,7 @@ def main():
         )
 
         print("\n--- Matriks A (preview) ---")
-        print(matriks_a)
+        print_matrix(matriks_a)
 
         # === Validasi sifat matriks A ===
         print("\n[Validasi Matriks A]")
@@ -141,7 +154,7 @@ def main():
             )
 
             print("\n--- Matriks B (preview) ---")
-            print(matriks_b)
+            print_matrix(matriks_b)
 
             print("\n--- Operasi Matriks (A & B) ---")
 
@@ -176,7 +189,11 @@ def main():
             # Export hasil (jika tidak dinonaktifkan)
             if not args.no_export and hasil_penjumlahan is not None:
                 export_to_csv(hasil_penjumlahan, "hasil_penjumlahan.csv")
-                export_to_json(hasil_penjumlahan, "hasil_penjumlahan.json")
+                try:
+                    export_to_json(hasil_penjumlahan, "hasil_penjumlahan.json")
+                except Exception:
+                    # jika json exporter belum ada / berbeda format, jangan crash
+                    pass
                 print("\nHasil diexport ke: hasil_penjumlahan.csv & hasil_penjumlahan.json")
 
         # === Operasi tambahan pada Matriks A ===
@@ -195,18 +212,18 @@ def main():
             from operations.determinant import find_determinant
             try:
                 print(f"\nDeterminan Matriks A: {find_determinant(matriks_a)}")
-            except:
+            except Exception:
                 print("[ERROR] Gagal menghitung determinan")
 
             try:
                 print("\nInvers Matriks A:")
                 print_matrix(inverse_matrix(matriks_a))
-            except:
+            except Exception:
                 print("[ERROR] Gagal menghitung invers")
         else:
             print("\n[INFO] Determinan dan invers dilewati: Matriks tidak persegi kecil.")
 
-        # === Regresi Linear ===
+        # === Regresi Linear Sederhana ===
         if matriks_a.rows >= 2 and matriks_a.cols >= 2:
             print("\n--- Regresi Linear Sederhana (kolom 0 vs kolom terakhir) ---")
 
@@ -222,26 +239,45 @@ def main():
             for x, y_pred in zip([100, 150, 200], predict([100, 150, 200], a, b)):
                 print(f"x={x} → y_pred={y_pred:.3f}")
 
-            # === Multiple Linear Regression ===
+            # === Multiple Linear Regression (pakai operations.mlr) ===
             print("\n--- Multiple Linear Regression ---")
-            X = [[1.0] + row[:-1] for row in matriks_a.data]  # Tambah bias
-            Y = [[row[-1]] for row in matriks_a.data]
+            # X: tambah kolom bias (1.0), fitur = semua kolom kecuali target terakhir
+            X = [[1.0] + row[:-1] for row in matriks_a.data]
+            # Y: list target
+            Y = [row[-1] for row in matriks_a.data]
 
-            X_MLR = Matrix(X)
-            Y_MLR = Matrix(Y)
+            # Panggil MLR dari module mlr (kembalian list atau string error)
+            try:
+                Beta = mlr_module.multiple_linear_regression(X, Y)
+            except Exception as e:
+                Beta = f"Error: {e}"
 
-            Beta = multiple_linear_regression(X_MLR, Y_MLR)
-
+            # Tampilkan hasil MLR:
             if isinstance(Beta, str):
                 print(f"[ERROR] Tidak dapat menghitung MLR: {Beta}")
             else:
-                b0, b1, b2, b3 = [Beta.data[i][0] for i in range(4)]
-                print(f"\nModel: Harga = {b0:.3f} + {b1:.3f}*Luas + {b2:.3f}*Kamar + {b3:.3f}*Usia")
+                # Beta bisa berupa list/array (koef per kolom)
+                try:
+                    # Pastikan iterable
+                    print("\nKoefisien MLR (Beta):")
+                    for i, coef in enumerate(Beta):
+                        print(f"b{i} = {float(coef):.6f}")
+                except Exception:
+                    # Fallback: print mentah
+                    print("Beta:", Beta)
 
         # Jika hanya matriks A yang diberikan, export langsung
         if not b_path and not args.no_export:
-            export_to_csv(matriks_a, "matriks_a_copy.csv")
-            export_to_json(matriks_a, "matriks_a_copy.json")
+            try:
+                export_to_csv(matriks_a, "matriks_a_copy.csv")
+            except Exception as e:
+                print(f"[WARN] Gagal export CSV: {e}")
+            try:
+                export_to_json(matriks_a, "matriks_a_copy.json")
+            except Exception:
+                # abaikan jika exporter json tidak kompatibel
+                pass
+
             print("\nMatriks A diekspor ke: matriks_a_copy.csv & matriks_a_copy.json")
 
     except Exception as e:

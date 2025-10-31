@@ -9,243 +9,140 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     
     <style>
-        /* Menggunakan font yang bersih dan modern */
         @layer base {
-            html {
-                font-family: 'Inter', sans-serif; 
-            }
+            html { font-family: 'Inter', sans-serif; }
         }
         .shadow-custom {
-            /* Shadow yang lebih dalam dan jelas */
             box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.1), 0 5px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        .transition-transform {
-            transition: transform 0.2s ease-in-out;
-        }
-        .hover\:scale-105:hover {
-            transform: scale(1.02);
-        }
+        .transition-transform { transition: transform 0.2s ease-in-out; }
+        .hover\:scale-105:hover { transform: scale(1.02); }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
 </head>
+
 <body class="bg-gray-50 min-h-screen p-4 sm:p-10">
+<div class="max-w-7xl mx-auto">
     
-    <div class="max-w-7xl mx-auto">
-        
-        <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">
-            🏠 Dashboard Analisis Regresi Properti
-        </h1>
-        <p class="text-center text-lg text-gray-500 mb-12 pb-4 border-b border-gray-200">
-            Visualisasi Model Regresi Linier Sederhana (SLR)
-        </p>
-        
-        {% if model_slr %}
-        
-        <h2 class="text-2xl font-semibold text-gray-700 mb-6">Ringkasan Model SLR</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-            
-            <div class="bg-white shadow-custom rounded-xl p-5 border-l-4 border-blue-900 transition-transform hover:scale-105">
-                <span class="text-sm font-medium text-gray-500 block mb-1">Intercept ($\alpha$) / Harga Dasar</span>
-                <p class="text-3xl font-bold text-blue-900">{{ model_slr.intercept }}</p>
-                <span class="text-xs text-gray-400">Nilai Y saat X = 0 (Base Price)</span>
-            </div>
+    <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">🏠 Dashboard Analisis Regresi Properti</h1>
+    <p class="text-center text-lg text-gray-500 mb-12 pb-4 border-b border-gray-200">
+        Visualisasi Model Regresi Linier Sederhana (SLR)
+    </p>
 
-            <div class="bg-white shadow-custom rounded-xl p-5 border-l-4 border-red-600 transition-transform hover:scale-105">
-                <span class="text-sm font-medium text-gray-500 block mb-1">Koefisien Luas ($\beta$) / Nilai per M²</span>
-                <p class="text-3xl font-bold text-red-800">{{ model_slr.slope_luas }}</p>
-                <span class="text-xs text-gray-400">Kenaikan Harga per 1 unit Luas</span>
+    {% if model_slr %}
+    
+    <h2 class="text-2xl font-semibold text-gray-700 mb-6">Ringkasan Model SLR</h2>
+
+    <!-- Card Ringkasan -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div class="bg-white shadow-custom rounded-xl p-5 border-l-4 border-blue-900 transition-transform hover:scale-105">
+            <span class="text-sm font-medium text-gray-500 block mb-1">Intercept (α)</span>
+            <p class="text-3xl font-bold text-blue-900">{{ model_slr.intercept }}</p>
+        </div>
+
+        <div class="bg-white shadow-custom rounded-xl p-5 border-l-4 border-red-600 transition-transform hover:scale-105">
+            <span class="text-sm font-medium text-gray-500 block mb-1">Slope Luas (β)</span>
+            <p class="text-3xl font-bold text-red-800">{{ model_slr.slope_luas }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Chart -->
+        <div class="lg:col-span-2">
+            <div class="bg-white shadow-2xl rounded-2xl p-6 border border-gray-200 mb-8">
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 pb-3 border-b border-gray-200">Visualisasi Scatter Plot Regresi</h2>
+
+                <div style="height: 550px;">
+                    <canvas id="regressionChart"></canvas>
+                </div>
+
+                <div class="mt-6">
+                    <p class="text-lg font-medium text-gray-700 mb-2">Persamaan Model Regresi:</p>
+                    <code class="block bg-gray-100 text-gray-900 p-4 rounded-xl text-xl font-mono border border-gray-300">
+                        {{ model_slr.equation }}
+                    </code>
+                </div>
             </div>
         </div>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            <div class="lg:col-span-2">
-                <div class="bg-white shadow-2xl rounded-2xl p-6 border border-gray-200 mb-8">
-                    <h2 class="text-2xl font-bold text-gray-700 mb-6 pb-3 border-b border-gray-200">
-                        Visualisasi Scatter Plot Regresi (HD)
-                    </h2>
 
-                    <div class="bg-white p-4 rounded-xl shadow-inner border border-gray-200">
-                        <h3 class="text-center font-semibold text-gray-700 mb-3">Harga Properti vs. Luas Bangunan</h3>
-                        <div style="height: 550px;"> 
-                            <canvas id="regressionChart" class="w-full h-full"></canvas>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-6">
-                        <p class="text-lg font-medium text-gray-700 mb-2">Persamaan Model Regresi:</p>
-                        <code class="block bg-gray-100 text-gray-900 p-4 rounded-xl text-xl font-mono break-words shadow-md border border-gray-300">
-                            {{ model_slr.equation }}
-                        </code>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="lg:col-span-1">
-                
-                <div class="bg-red-50 border-2 border-red-400 text-red-800 p-6 rounded-xl shadow-custom mb-8" role="alert">
-                    <h4 class="text-xl font-bold mb-3 flex items-center">
-                        <svg class="w-6 h-6 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                        Status Model (MLR)
-                    </h4>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-800 mb-3">
-                        ⚠️ GAGAL DIHITUNG
-                    </span>
-                    <p class="text-sm text-red-900">
-                        **Penyebab Teknis:** Fungsi `inverse_matrix` hanya mendukung matriks 2x2 dan 3x3. Model MLR dengan 3 fitur (Luas, Kamar, Usia) membutuhkan matriks 4x4, sehingga perhitungan inversi dan regresi MLR tidak dapat diselesaikan.
-                    </p>
-                </div>
+        <!-- Tabel preview -->
+        <div class="lg:col-span-1">
+            <div class="bg-white shadow-2xl rounded-2xl p-6 border border-gray-200">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">Data Sampel (Top 10)</h2>
 
-                <div class="bg-white shadow-2xl rounded-2xl p-6 border border-gray-200">
-                    <h2 class="text-2xl font-semibold text-gray-800 mb-4 pb-3 border-b border-gray-200">
-                        Data Sampel (Top 10)
-                    </h2>
-                    <div class="overflow-x-auto rounded-lg border border-gray-200">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    {% for header in preview_data.headers %}
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                                        {{ header }}
-                                    </th>
-                                    {% endfor %}
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-100">
-                                {% for row in preview_data.rows %}
-                                <tr class="hover:bg-gray-50 transition duration-150">
-                                    {% for cell in row %}
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                                        {{ cell }}
-                                    </td>
-                                    {% endfor %}
-                                </tr>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                {% for header in preview_data.headers %}
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                                    {{ header }}
+                                </th>
                                 {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            {% for row in preview_data.rows %}
+                            <tr class="hover:bg-gray-50">
+                                {% for cell in row %}
+                                <td class="px-4 py-2 text-sm text-gray-900">{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-
             </div>
-
-        </div> {% else %}
-        <div class="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg relative shadow-md" role="alert">
-            <strong class="font-bold">Gagal Memuat Data!</strong>
-            <span class="block sm:inline">{{ preview_data.error }}</span>
         </div>
-        {% endif %}
 
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var chartData = {{ chart_data | tojson | safe }};
+    {% else %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md">
+        <strong class="font-bold">Gagal Memuat Data!</strong>
+        <span class="block sm:inline">{{ preview_data.error }}</span>
+    </div>
+    {% endif %}
 
-            if (chartData && chartData.luas && chartData.harga) {
-                
-                // Data Scatter (Titik)
-                var scatterData = chartData.luas.map(function(luas, index) {
-                    return { x: luas, y: chartData.harga[index] };
-                });
-                
-                var minLuas = Math.min(...chartData.luas);
-                var maxLuas = Math.max(...chartData.luas);
-                
-                var modelSlr = {{ model_slr | tojson | safe }};
-                
-                var lineData = [];
-                if (modelSlr && modelSlr.intercept && modelSlr.slope_luas) {
-                    var intercept = parseFloat(modelSlr.intercept);
-                    var slope = parseFloat(modelSlr.slope_luas);
+</div>
 
-                    var minPred = intercept + slope * minLuas;
-                    var maxPred = intercept + slope * maxLuas;
-                    
-                    // Garis Regresi (hanya 2 titik)
-                    lineData = [
-                        { x: minLuas, y: minPred },
-                        { x: maxLuas, y: maxPred }
-                    ];
-                }
+<script>
+document.addEventListener('DOMContentLoaded', function() {
 
-                // Inisialisasi Chart.js
-                const ctx = document.getElementById('regressionChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'scatter',
-                    data: {
-                        datasets: [
-                            {
-                                label: 'Harga Aktual',
-                                data: scatterData,
-                                type: 'scatter', // Pastikan tipe scatter
-                                
-                                // WARNA BARU: Biru Navy Solid (Kontras Tinggi)
-                                backgroundColor: 'rgb(30, 58, 138)', /* blue-900 */
-                                pointRadius: 5, // Ukuran titik
-                                pointHoverRadius: 8,
-                                pointStyle: 'circle', // Bentuk titik jelas
-                            },
-                            {
-                                label: 'Garis Tren (SLR)',
-                                data: lineData,
-                                type: 'line',
-                                
-                                // WARNA BARU: Merah Solid (Kontras Tinggi)
-                                borderColor: 'rgb(220, 38, 38)', /* red-600 */
-                                
-                                borderWidth: 4, // Garis tebal
-                                fill: false,
-                                pointRadius: 0,
-                                tension: 0, // Garis lurus sempurna
-                            }
-                        ]
-                    },
-                    options: {
-                        // KUNCI HD/RETINA: Menggandakan resolusi rendering
-                        devicePixelRatio: 2, 
-                        
-                        responsive: true,
-                        maintainAspectRatio: false, 
-                        scales: {
-                            x: {
-                                type: 'linear',
-                                position: 'bottom',
-                                title: {
-                                    display: true,
-                                    text: 'Luas Bangunan (X)',
-                                    font: { size: 16, weight: 'bold', family: 'Inter', color: 'rgb(31, 41, 55)' }
-                                },
-                                // Garis grid yang sangat halus dan hampir putih
-                                grid: { color: 'rgba(230, 230, 230, 0.5)', drawBorder: false } 
-                            },
-                            y: {
-                                title: {
-                                    display: true,
-                                    text: 'Harga Properti (Y)',
-                                    font: { size: 16, weight: 'bold', family: 'Inter', color: 'rgb(31, 41, 55)' }
-                                },
-                                grid: { color: 'rgba(230, 230, 230, 0.5)', drawBorder: false }
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'top',
-                                labels: {
-                                    usePointStyle: true, // Menggunakan style titik untuk legenda
-                                    font: {
-                                        size: 14,
-                                        family: 'Inter'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-        });
-    </script>
-    </body>
+    // ✅ Pastikan selalu memasukkan variabel aman
+    var chartData = {{ chart_data | tojson | safe }} || {};
+    var modelSlr = {{ model_slr | tojson | safe }} || null;
+
+    
+    if (!chartData || !chartData.luas) return;
+
+    const scatterData = chartData.luas.map((luas, i) => ({ x: luas, y: chartData.harga[i] }));
+
+    const ctx = document.getElementById('regressionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                { label: 'Harga Aktual', data: scatterData, backgroundColor: 'rgb(30,58,138)' },
+
+                modelSlr ? {
+                    label: 'Garis Regresi',
+                    type: 'line',
+                    borderColor: 'rgb(220,38,38)',
+                    borderWidth: 3,
+                    fill: false,
+                    data: [
+                        { x: Math.min(...chartData.luas), y: parseFloat(modelSlr.intercept) + parseFloat(modelSlr.slope_luas) * Math.min(...chartData.luas) },
+                        { x: Math.max(...chartData.luas), y: parseFloat(modelSlr.intercept) + parseFloat(modelSlr.slope_luas) * Math.max(...chartData.luas) }
+                    ]
+                } : {}
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+});
+</script>
+
+</body>
 </html>
