@@ -30,7 +30,7 @@ except ImportError:
 app = Flask(__name__)
 
 # File data ada di direktori kerja saat ini (CWD: ~/formatter)
-DATA_FILE_RAW  =  r"/home/felix_ryan/formatter/matriks_a_copy.csv"
+DATA_FILE_RAW = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'matriks_a_copy.csv'))
 COLUMNS = ['Luas', 'Kamar', 'Usia', 'Harga']
 LUAS_COL_INDEX = 0
 HARGA_COL_INDEX = 3

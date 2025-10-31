@@ -10,5 +10,9 @@ services:
       - "5000:5000"
     environment:
       - PYTHONUNBUFFERED=1
-      - RUN_MODE=flask  # ubah ke "cli" kalau mau mode main.py
     tty: true
+    command: >
+      sh -c "
+      python3 main.py --a house_multifeature.csv --skip-header &&
+      python3 visualizer_flask/app.py
+      "
